@@ -1,6 +1,6 @@
 //grab the packages we need for our user model
 var mongoose = require("mongoose");
-var schema = mongoose.Schema;
+var Schema = mongoose.Schema;
 var bcrypt = require("bcrypt-nodejs");
 
 // create a user schema

@@ -10,7 +10,11 @@
  var port = process.env.PORT || 8080; // set the port for our app
  //using our user.js file as a model
 
- var User = require("./app/models/user.js");
+ var User = require("./app/models/user");
+ 
+ // connect to our database (hosted on modulus.io)
+ //mongoose.connect('mongodb://node:noder@novus.modulusmongo.net:27017/Iganiq8o');
+ mongoose.connect('mongodb://127.0.0.1:27017/myDatabase');
 
  // APP CONFIGURATION ---------------------
  // use body parser so we can grab information from POST requests
@@ -40,11 +44,116 @@
  // get an instance of the express router
  var apiRouter = express.Router();
 
- // test route to make sure everything is working
- // accessed at GET http://localhost:8080/api
- apiRouter.get('/', function(req, res) {
- res.json({ message: 'hooray! welcome to our api!' });
+ apiRouter.use(function(req,res,next){
+     //do logging
+     console.log("Somebody just came to my app");
+     //make sure we go to next route and dont stop here
+   
+     next();
  });
+
+/*apiRouter.rout('/users')
+//create a user accessed via url (POST http://localhost:8080/api/users)
+.post(function(req,res){
+    var user = new User();
+    //set users information (comes from request)
+    user.name = req.body.name;
+    user.username= req.body.username;
+    user.password= req.body.password;
+    
+    //save the user and check for errors
+    user.save(function(err){
+        if(err)
+            {
+                if(err.code= 11000)
+                 return res.json({success:false,message:"user with that username already exists"});
+                else 
+                    return res.send(err);
+            }
+        res.json({message:"user created!"});
+    });
+});*/
+
+apiRouter.route('/users')
+// create a user (accessed at POST http://localhost:8080/api/users)
+ 
+.post(function(req, res) {
+
+     // create a new instance of the User model
+     var user = new User();
+
+     // set the users information (comes from the request)
+     user.name = req.body.name;
+     user.username = req.body.username;
+     user.password = req.body.password;
+
+     // save the user and check for errors
+     user.save(function(err) {
+     if (err) {
+     // duplicate entry
+     if (err.code == 11000)
+     return res.json({ success: false, message: 'A user with that\
+     username already exists. '});
+     else
+     return res.send(err);
+     }
+
+     res.json({ message: 'User created!' });
+     });
+
+     })
+.get(function(req,res){
+        User.find(function(err,users){
+            if(err)res.send(err);
+            res.json(users);
+        });
+    });
+
+// on routes that end in /users/:user_id
+ // ----------------------------------------------------
+ apiRouter.route('/users/:user_id')
+
+ // get the user with that id
+ // (accessed at GET http://localhost:8080/api/users/:user_id)
+.get(function(req, res) {
+     User.findById(req.params.user_id, function(err, user) {
+     if (err) res.send(err);
+
+     // return that user
+     res.json(user);
+     });
+ })
+.put(function(req,res){
+       //use our user model to find the user we want
+     User.findById(req.params.user_id,function(err,user){
+         if(err) res.send(err);
+         //update the user only if its new
+         if(req.body.name) user.name = req.body.name;
+         if(req.body.username) user.username = req.body.username;
+         if(req.body.password) user.password = req.body.password;
+         
+         //save the user
+         user.save(function(err){
+             if(err) res.send(err);
+             res.json({message: "user updated !"});
+         });
+     });
+ })
+.delete(function(req, res) {
+     User.remove({
+     _id: req.params.user_id
+     }, function(err, user) {
+     if (err) return res.send(err);
+
+     res.json({ user:user.name,message: 'Successfully deleted' });
+     });
+ });
+
+     // test route to make sure everything is working
+     // accessed at GET http://localhost:8080/api
+     apiRouter.get('/', function(req, res) {
+     res.json({ message: 'hooray! welcome to our api!' });
+     });
 
  // more routes for our API will happen here
 
