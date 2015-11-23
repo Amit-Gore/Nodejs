@@ -8,10 +8,10 @@
  var morgan = require('morgan'); // used to see requests
  var mongoose = require('mongoose'); // for working w/ our database
  var port = process.env.PORT || 8080; // set the port for our app
+ var jwt = require('jsonwebtoken');
  //using our user.js file as a model
-
  var User = require("./app/models/user");
- 
+ var SuperSecret = 'codehard';
  // connect to our database (hosted on modulus.io)
  //mongoose.connect('mongodb://node:noder@novus.modulusmongo.net:27017/Iganiq8o');
  mongoose.connect('mongodb://127.0.0.1:27017/myDatabase');
@@ -43,36 +43,87 @@
 
  // get an instance of the express router
  var apiRouter = express.Router();
-
- apiRouter.use(function(req,res,next){
-     //do logging
-     console.log("Somebody just came to my app");
-     //make sure we go to next route and dont stop here
-   
-     next();
+ // route to authenticate a user (POST http://localhost:8080/api/authenticate)
+ apiRouter.post('/authenticate',function(req,res){
+     // find the user
+     // select the name username and password explicitly
+     User.findOne({
+         username: req.body.username
+     }).select('name username password').exec(function(err,user){
+         if(err) throw err;
+         //if no user with that username was found 
+         
+         if(!user){
+             res.json({success:false,message:'Authentication Failed'
+         });
+         }
+         else if(user) {
+             //check if password matches
+             var validPassword = user.comparePassword(req.body.password);
+             if (!validPassword){
+                 res.json({
+                     success:false,
+                     message: 'Authentication Failed, password not matched'
+                 });   
+             }
+             else{
+                 //if authentication is succeded
+                 //create a token
+                 var token = jwt.sign(
+                     {name : user.name,
+                     username : user.username},
+                      SuperSecret,
+                     {
+                       expiresInMinutes: 1440     
+                      }                
+                );
+                 res.json({
+                     success:true,
+                     message:'Token Create Amit',
+                     token : token    
+                 });
+             }
+         }
+         
+     });
+     
  });
 
-/*apiRouter.rout('/users')
-//create a user accessed via url (POST http://localhost:8080/api/users)
-.post(function(req,res){
-    var user = new User();
-    //set users information (comes from request)
-    user.name = req.body.name;
-    user.username= req.body.username;
-    user.password= req.body.password;
-    
-    //save the user and check for errors
-    user.save(function(err){
-        if(err)
-            {
-                if(err.code= 11000)
-                 return res.json({success:false,message:"user with that username already exists"});
-                else 
-                    return res.send(err);
-            }
-        res.json({message:"user created!"});
-    });
-});*/
+ apiRouter.use(function(req,res,next){
+     var token = req.body.token||req.param('token')||req.headers['x-access-token'];
+     if(token){
+         //verify secret and expiration
+         jwt.verify(token,SuperSecret,function(err,decoded){
+             if(err)
+                 {
+                     return res.status(403).send({
+                         success:false,
+                         message:'failed to authenticate the token.'
+                     });
+                     
+                 }
+             else{
+                 //if everything is good then save the requst for use in other routes
+                 req.decoded= decoded;
+                 next();
+             }
+         });
+         
+     }
+     else{
+         //token not received
+         //return a http response of 403(forbidden access)and error message
+         return res.status(403).send({
+             success:false,
+             message: 'Token not received'
+         });
+         
+     }
+ });
+
+apiRouter.get('/me',function(req,res){
+    res.send(req.decoded);
+});
 
 apiRouter.route('/users')
 // create a user (accessed at POST http://localhost:8080/api/users)
